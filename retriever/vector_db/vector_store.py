@@ -6,6 +6,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models as qm
 
 from .embedder import EmbeddingModel
+from ..utils.hash import id_from_text
 from ..schemas import ChunkRecord, NoteRecord
 
 CHUNK_COLLECTION = "obsidian_chunks"
@@ -62,7 +63,7 @@ class VectorStore:
                 "links_to_chunks": chunk.links_to_chunks,
             }
             points.append(qm.PointStruct(
-                id=chunk.chunk_id,
+                id=id_from_text(chunk.chunk_id),
                 vector=vector.astype(float).tolist(),
                 payload=payload
             ))
@@ -88,7 +89,7 @@ class VectorStore:
         }
 
         point = qm.PointStruct(
-            id=note.note_id,
+            id=id_from_text(note.note_id),
             vector=embedding.astype(float).tolist(),
             payload=payload
         )
