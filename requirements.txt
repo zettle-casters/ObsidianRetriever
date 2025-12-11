@@ -5,4 +5,4 @@ pydantic
 neomodel
 langchain_community==0.3.29
 langchain_text_splitters==0.3.11
-
+tzdata; platform_system == "Windows"
