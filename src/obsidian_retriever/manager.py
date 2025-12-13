@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import os
 import tempfile
 import zipfile
-
 from typing import Optional, List, Tuple, Iterable, Dict
+
+from obsidian_parser.parse import load_obsidian_with_filters
 
 from .vector_db.vector_store import VectorStore
 from .graph_db.db import init_db
 from .graph_db.repository import NoteRepository, ChunkRepository
-from .schemas import NoteRecord, ChunkRecord, BlockRecord, NoteLinkRecord, ChunkLinkRecord
-from .utils.parse import load_obsidian_with_filters
-from .utils.hash import text_hash, id_from_text
-
+from .schemas import NoteRecord, ChunkRecord, NoteLinkRecord, ChunkLinkRecord
+from .utils.hash import text_hash
 
 
 # TODO: Advanced graph algorithms for retriever(PageRank, Shortest path, etc.)
