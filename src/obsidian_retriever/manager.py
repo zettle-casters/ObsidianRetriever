@@ -21,8 +21,9 @@ class KnowledgeBaseManager:
         host: str = "localhost",
         port: int = 6333,
         prefer_grpc: bool = False,
-        model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+        model_name: str = "openai/text-embedding-3-large"
     ) -> None:
+        print(model_name)
         init_db(db_url)
         self.note_repository = NoteRepository()
         self.chunk_repository = ChunkRepository()

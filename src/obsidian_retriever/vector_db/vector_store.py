@@ -18,7 +18,7 @@ class VectorStore:
         host : str = "localhost",
         port : int = 6333,
         prefer_grpc : bool = False,
-        model_name : str = "sentence-transformers/all-MiniLM-L6-v2"
+        model_name : str = "openai/text-embedding-3-large"
     ) -> None:
         self.client = QdrantClient(host=host, port=port, prefer_grpc=prefer_grpc)
         self.embedder = EmbeddingModel(model_name)
@@ -106,7 +106,7 @@ class VectorStore:
         note_ids : Optional[List[str]] = None,
         block_ids : Optional[List[str]] = None
     ) -> List[qm.ScoredPoint]:
-        query_vec = self.embedder.encode_one(query)
+        query_vec = self.embedder.encode_one(query).flatten()
 
         must = []
 
@@ -137,7 +137,7 @@ class VectorStore:
         query : str,
         top_k : int = 10
     ) -> List[qm.ScoredPoint]:
-        query_vec = self.embedder.encode_one(query)
+        query_vec = self.embedder.encode_one(query).flatten()
 
         result = self.client.query_points(
             collection_name=NOTE_COLLECTION,
