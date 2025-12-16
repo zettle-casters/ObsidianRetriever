@@ -18,10 +18,12 @@ class VectorStore:
         host : str = "localhost",
         port : int = 6333,
         prefer_grpc : bool = False,
-        model_name : str = "openai/text-embedding-3-large"
+        model_name : str = "openai/text-embedding-3-large",
+        api_key : Optional[str] = None,
+        base_url : Optional[str] = None
     ) -> None:
         self.client = QdrantClient(host=host, port=port, prefer_grpc=prefer_grpc)
-        self.embedder = EmbeddingModel(model_name)
+        self.embedder = EmbeddingModel(model_name, api_key=api_key, base_url=base_url)
         self._ensure_collections()
 
     def _ensure_collections(self) -> None:

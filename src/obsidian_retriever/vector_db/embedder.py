@@ -1,13 +1,18 @@
-from typing import List
+from typing import List, Optional
 import numpy as np
 from langchain_openai import OpenAIEmbeddings
 
 class EmbeddingModel:
-    def __init__(self, model_name: str = "openai/text-embedding-3-large") -> None:
+    def __init__(
+        self,
+        model_name: str = "openai/text-embedding-3-large",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None
+    ) -> None:
         self.model = OpenAIEmbeddings(
             model=model_name,
-            api_key="REMOVED_API_KEY",
-            base_url="https://openrouter.ai/api/v1"
+            api_key=api_key,
+            base_url=base_url
         )
 
         self.dim = len(self.model.embed_query("test"))
