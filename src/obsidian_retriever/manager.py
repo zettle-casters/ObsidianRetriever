@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import zipfile
 from typing import Optional, List, Tuple, Iterable, Dict
@@ -335,20 +336,43 @@ class KnowledgeBaseManager:
                 if not target_name:
                     continue
 
-                to_note_id = path_to_note_id.get(target_name)
-                if not to_note_id:
+                # Resolve possible target note ids. The parser sometimes returns
+                # just a filename (basename) or a name without extension. We try
+                # several matching strategies and allow multiple matches.
+                resolved_targets = []
+
+                # 1) exact match
+                if target_name in path_to_note_id:
+                    resolved_targets.append(path_to_note_id[target_name])
+
+                # 2) try with/without .md extension
+                if "." not in target_name:
+                    alt = f"{target_name}.md"
+                    if alt in path_to_note_id:
+                        resolved_targets.append(path_to_note_id[alt])
+
+                # 3) match by basename (filename only)
+                basename = os.path.basename(target_name)
+                for path, nid in path_to_note_id.items():
+                    if os.path.basename(path) == basename:
+                        if nid not in resolved_targets:
+                            resolved_targets.append(nid)
+
+                # If no targets found - ignore (per new behaviour)
+                if not resolved_targets:
                     continue
 
-                # doc-level ссылка между заметками
-                note_links_pairs.add((from_note_id, to_note_id))
+                # For each resolved target note, add a doc-level link
+                for to_note_id in resolved_targets:
+                    note_links_pairs.add((from_note_id, to_note_id))
 
-                # chunk-level: [[Note#Heading]]
-                anchor = link.get("anchor")
-                if anchor:
-                    key = (to_note_id, anchor)
-                    target_chunk_id = anchor_to_chunk.get(key)
-                    if target_chunk_id:
-                        chunk_links_pairs.add((from_chunk_id, target_chunk_id))
+                    # chunk-level: [[Note#Heading]]
+                    anchor = link.get("anchor")
+                    if anchor:
+                        key = (to_note_id, anchor)
+                        target_chunk_id = anchor_to_chunk.get(key)
+                        if target_chunk_id:
+                            chunk_links_pairs.add((from_chunk_id, target_chunk_id))
 
                 # [[Note^block-ref]] пока игнорируем: мы не ведём mapping block_ref -> chunk
 
