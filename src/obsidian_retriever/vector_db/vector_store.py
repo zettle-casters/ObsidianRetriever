@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Iterable, List, Dict, Optional
+
+from typing import Iterable, List, Optional
 
 import numpy as np
 from qdrant_client import QdrantClient
@@ -12,16 +13,17 @@ from ..schemas import ChunkRecord, NoteRecord
 CHUNK_COLLECTION = "obsidian_chunks"
 NOTE_COLLECTION = "obsidian_notes"
 
+
 class VectorStore:
     def __init__(
         self,
-        host : str = "localhost",
-        port : int = 6333,
-        prefer_grpc : bool = False,
-        model_name : str = "openai/text-embedding-3-large",
-        api_key : Optional[str] = None,
-        base_url : Optional[str] = None,
-        vault_id : Optional[str] = None
+        host: str = "localhost",
+        port: int = 6333,
+        prefer_grpc: bool = False,
+        model_name: str = "openai/text-embedding-3-large",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        vault_id: Optional[str] = None,
     ) -> None:
         self.client = QdrantClient(host=host, port=port, prefer_grpc=prefer_grpc)
         self.embedder = EmbeddingModel(model_name, api_key=api_key, base_url=base_url)
@@ -49,7 +51,7 @@ class VectorStore:
                 )
             )
 
-    def upsert_chunks(self, chunks : Iterable[ChunkRecord]) -> None:
+    def upsert_chunks(self, chunks: Iterable[ChunkRecord]) -> None:
         chunks = list(chunks)
         if not chunks:
             return
@@ -79,14 +81,14 @@ class VectorStore:
             points=points
         )
 
-    def aggregate_note_embedding(self, chunks : List[ChunkRecord]) -> np.ndarray:
+    def aggregate_note_embedding(self, chunks: List[ChunkRecord]) -> np.ndarray:
         texts = [chunk.text for chunk in chunks]
         if not texts:
             return np.zeros(self.embedder.dim, dtype=float)
         chunk_vectors = self.embedder.encode(texts)
         return chunk_vectors.mean(axis=0)
 
-    def upsert_note(self, note : NoteRecord, embedding : np.ndarray) -> None:
+    def upsert_note(self, note: NoteRecord, embedding: np.ndarray) -> None:
         payload = {
             "note_id": note.note_id,
             "path": note.path,
@@ -111,10 +113,10 @@ class VectorStore:
 
     def search_chunks(
         self,
-        query : str,
-        top_k : int = 10,
-        note_ids : Optional[List[str]] = None,
-        block_ids : Optional[List[str]] = None
+        query: str,
+        top_k: int = 10,
+        note_ids: Optional[List[str]] = None,
+        block_ids: Optional[List[str]] = None,
     ) -> List[qm.ScoredPoint]:
         query_vec = self.embedder.encode_one(query).flatten()
 
@@ -150,8 +152,8 @@ class VectorStore:
 
     def search_notes(
         self,
-        query : str,
-        top_k : int = 10
+        query: str,
+        top_k: int = 10,
     ) -> List[qm.ScoredPoint]:
         query_vec = self.embedder.encode_one(query).flatten()
 
@@ -172,7 +174,7 @@ class VectorStore:
         ).points
         return result
 
-    def delete_chunks(self, chunk_ids : List[str]) -> None:
+    def delete_chunks(self, chunk_ids: List[str]) -> None:
         if not chunk_ids:
             return
         self.client.delete(
@@ -180,7 +182,7 @@ class VectorStore:
             points_selector=qm.PointIdsList(points=[id_from_text(cid) for cid in chunk_ids])
         )
 
-    def delete_notes(self, note_ids : List[str]) -> None:
+    def delete_notes(self, note_ids: List[str]) -> None:
         if not note_ids:
             return
         self.client.delete(

@@ -18,14 +18,14 @@ from .utils.hash import text_hash
 class KnowledgeBaseManager:
     def __init__(
         self,
-        db_url : str,
+        db_url: str,
         host: str = "localhost",
         port: int = 6333,
         prefer_grpc: bool = False,
         model_name: str = "openai/text-embedding-3-large",
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        vault_id: Optional[str] = None
+        vault_id: Optional[str] = None,
     ) -> None:
         print(model_name)
         init_db(db_url)
@@ -59,6 +59,24 @@ class KnowledgeBaseManager:
             "children": hierarchical_structure["children"],
             "chunks": hierarchical_structure["chunks"],
         }
+
+    def _resolve_target_note_ids(self, target_name: str, path_to_note_id: Dict[str, str]) -> List[str]:
+        resolved_targets: List[str] = []
+
+        if target_name in path_to_note_id:
+            resolved_targets.append(path_to_note_id[target_name])
+
+        if "." not in target_name:
+            alt = f"{target_name}.md"
+            if alt in path_to_note_id:
+                resolved_targets.append(path_to_note_id[alt])
+
+        basename = os.path.basename(target_name)
+        for path_key, nid in path_to_note_id.items():
+            if os.path.basename(path_key) == basename and nid not in resolved_targets:
+                resolved_targets.append(nid)
+
+        return resolved_targets
 
     def upsert_note_from_content(self, path: str, content: str, max_chunk_size: int = 500) -> str:
         note_dict = self._build_note_dict(path, content, max_chunk_size)
@@ -97,19 +115,7 @@ class KnowledgeBaseManager:
                 if not target_name:
                     continue
 
-                resolved_targets = []
-                if target_name in path_to_note_id:
-                    resolved_targets.append(path_to_note_id[target_name])
-
-                if "." not in target_name:
-                    alt = f"{target_name}.md"
-                    if alt in path_to_note_id:
-                        resolved_targets.append(path_to_note_id[alt])
-
-                basename = os.path.basename(target_name)
-                for path_key, nid in path_to_note_id.items():
-                    if os.path.basename(path_key) == basename and nid not in resolved_targets:
-                        resolved_targets.append(nid)
+                resolved_targets = self._resolve_target_note_ids(target_name, path_to_note_id)
 
                 for to_note_id in resolved_targets:
                     to_note_ids.add(to_note_id)
@@ -139,10 +145,10 @@ class KnowledgeBaseManager:
 
     def search_chunks(
         self,
-        query : str,
-        top_k : int = 10,
-        note_ids : Optional[List[str]] = None,
-        block_ids : Optional[List[str]] = None
+        query: str,
+        top_k: int = 10,
+        note_ids: Optional[List[str]] = None,
+        block_ids: Optional[List[str]] = None,
     ) -> List[Tuple[ChunkRecord, float]]:
         scored_points = self.vector_store.search_chunks(
             query=query, top_k=top_k, note_ids=note_ids, block_ids=block_ids
@@ -161,8 +167,8 @@ class KnowledgeBaseManager:
 
     def search_notes(
         self,
-        query : str,
-        top_k : int = 10
+        query: str,
+        top_k: int = 10,
     ) -> List[Tuple[NoteRecord, float]]:
         scored_points = self.vector_store.search_notes(
             query=query, top_k=top_k
@@ -179,32 +185,32 @@ class KnowledgeBaseManager:
             result.append((note, point.score))
         return result
 
-    def get_note(self, note_id : str) -> Optional[NoteRecord]:
+    def get_note(self, note_id: str) -> Optional[NoteRecord]:
         note = self.note_repository.get_by_id(note_id)
         return note
 
-    def get_chunk(self, chunk_id : str) -> Optional[ChunkRecord]:
+    def get_chunk(self, chunk_id: str) -> Optional[ChunkRecord]:
         chunk = self.chunk_repository.get_by_id(chunk_id)
         return chunk
 
-    def get_note_neighbors(self, note_id : str) -> Tuple[List[NoteLinkRecord], List[NoteLinkRecord]]:
+    def get_note_neighbors(self, note_id: str) -> Tuple[List[NoteLinkRecord], List[NoteLinkRecord]]:
         outgoing = self.note_repository.get_outgoing_links(note_id) or []
         incoming = self.note_repository.get_incoming_links(note_id) or []
         return outgoing, incoming
 
-    def get_chunk_neighbors(self, chunk_id : str) -> Tuple[List[ChunkLinkRecord], List[ChunkLinkRecord]]:
+    def get_chunk_neighbors(self, chunk_id: str) -> Tuple[List[ChunkLinkRecord], List[ChunkLinkRecord]]:
         outgoing = self.chunk_repository.get_outgoing_links(chunk_id) or []
         incoming = self.chunk_repository.get_incoming_links(chunk_id) or []
         return outgoing, incoming
 
     def add_note(
         self,
-        note : NoteRecord,
-        chunks : Iterable[ChunkRecord]
+        note: NoteRecord,
+        chunks: Iterable[ChunkRecord],
     ) -> NoteRecord:
         chunks = list(chunks)
 
-        chunks_content = "\n".join([chunk.text for chunk in chunks])
+        chunks_content = "\n".join(chunk.text for chunk in chunks)
         content_hash = text_hash(chunks_content)
 
         note_db = self.note_repository.upsert(note, content_hash)
@@ -219,43 +225,43 @@ class KnowledgeBaseManager:
 
     def set_note_links(
         self,
-        from_note_id : str,
-        to_note_ids : List[str],
-        link_type : str = "wiki"
+        from_note_id: str,
+        to_note_ids: List[str],
+        link_type: str = "wiki",
     ) -> None:
         self.note_repository.set_links(from_note_id, to_note_ids, link_type)
 
     def connect_notes(
         self,
-        from_note_id : str,
-        to_note_id : str,
-        link_type : str = "wiki"
+        from_note_id: str,
+        to_note_id: str,
+        link_type: str = "wiki",
     ) -> None:
         self.note_repository.add_link(from_note_id, to_note_id, link_type)
 
     def set_chunk_links(
         self,
-        from_chunk_id : str,
-        to_chunk_ids : List[str],
-        link_type : str = "reference"
+        from_chunk_id: str,
+        to_chunk_ids: List[str],
+        link_type: str = "reference",
     ) -> None:
         self.chunk_repository.set_links(from_chunk_id, to_chunk_ids, link_type)
 
     def connect_chunks(
         self,
-        from_chunk_id : str,
-        to_chunk_id : str,
-        link_type : str = "reference"
+        from_chunk_id: str,
+        to_chunk_id: str,
+        link_type: str = "reference",
     ) -> None:
         self.chunk_repository.add_link(from_chunk_id, to_chunk_id, link_type)
 
     # TODO: Note Tree hierarchal logic
     def init_vault_from_zip(
         self,
-        zip_path : str,
-        include_paths : List[str] = [],
-        exclude_paths : List[str] = [],
-        max_chunk_size : int = 500
+        zip_path: str,
+        include_paths: List[str] = [],
+        exclude_paths: List[str] = [],
+        max_chunk_size: int = 500,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with zipfile.ZipFile(zip_path, "r") as zf:
@@ -271,7 +277,6 @@ class KnowledgeBaseManager:
             path_to_note_id = {}
             for note_dict in notes_data:
                 path = note_dict["path"]
-                name = note_dict["name"]
                 note_id = self._qualify_note_id(path)  # соглашение: note_id == относительный путь файла
                 path_to_note_id[path] = note_id
 
@@ -283,7 +288,6 @@ class KnowledgeBaseManager:
             chunk_to_note = {}
 
             for note_dict in notes_data:
-                name = note_dict["name"]
                 path = note_dict["path"]
                 note_id = path_to_note_id[path]
 
@@ -440,27 +444,7 @@ class KnowledgeBaseManager:
                 if not target_name:
                     continue
 
-                # Resolve possible target note ids. The parser sometimes returns
-                # just a filename (basename) or a name without extension. We try
-                # several matching strategies and allow multiple matches.
-                resolved_targets = []
-
-                # 1) exact match
-                if target_name in path_to_note_id:
-                    resolved_targets.append(path_to_note_id[target_name])
-
-                # 2) try with/without .md extension
-                if "." not in target_name:
-                    alt = f"{target_name}.md"
-                    if alt in path_to_note_id:
-                        resolved_targets.append(path_to_note_id[alt])
-
-                # 3) match by basename (filename only)
-                basename = os.path.basename(target_name)
-                for path, nid in path_to_note_id.items():
-                    if os.path.basename(path) == basename:
-                        if nid not in resolved_targets:
-                            resolved_targets.append(nid)
+                resolved_targets = self._resolve_target_note_ids(target_name, path_to_note_id)
 
                 # If no targets found - ignore (per new behaviour)
                 if not resolved_targets:
