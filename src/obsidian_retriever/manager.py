@@ -24,14 +24,29 @@ class KnowledgeBaseManager:
         prefer_grpc: bool = False,
         model_name: str = "openai/text-embedding-3-large",
         api_key: Optional[str] = None,
-        base_url: Optional[str] = None
+        base_url: Optional[str] = None,
+        vault_id: Optional[str] = None
     ) -> None:
         print(model_name)
         init_db(db_url)
         self.note_repository = NoteRepository()
         self.chunk_repository = ChunkRepository()
-        self.vector_store = VectorStore(host, port, prefer_grpc, model_name, api_key=api_key, base_url=base_url)
+        self.vault_id = vault_id
+        self.vector_store = VectorStore(
+            host,
+            port,
+            prefer_grpc,
+            model_name,
+            api_key=api_key,
+            base_url=base_url,
+            vault_id=vault_id,
+        )
         self.vector_store._ensure_collections()
+
+    def _qualify_note_id(self, path: str) -> str:
+        if not self.vault_id:
+            return path
+        return f"{self.vault_id}:{path}"
 
     def search_chunks(
         self,
@@ -168,7 +183,7 @@ class KnowledgeBaseManager:
             for note_dict in notes_data:
                 path = note_dict["path"]
                 name = note_dict["name"]
-                note_id = path  # соглашение: note_id == относительный путь файла
+                note_id = self._qualify_note_id(path)  # соглашение: note_id == относительный путь файла
                 path_to_note_id[path] = note_id
 
             # --- ПЕРВЫЙ ПРОХОД: чанки + якоря в памяти ---

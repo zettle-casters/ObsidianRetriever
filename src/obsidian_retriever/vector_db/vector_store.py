@@ -20,10 +20,12 @@ class VectorStore:
         prefer_grpc : bool = False,
         model_name : str = "openai/text-embedding-3-large",
         api_key : Optional[str] = None,
-        base_url : Optional[str] = None
+        base_url : Optional[str] = None,
+        vault_id : Optional[str] = None
     ) -> None:
         self.client = QdrantClient(host=host, port=port, prefer_grpc=prefer_grpc)
         self.embedder = EmbeddingModel(model_name, api_key=api_key, base_url=base_url)
+        self.vault_id = vault_id
         self._ensure_collections()
 
     def _ensure_collections(self) -> None:
@@ -64,6 +66,8 @@ class VectorStore:
                 "index": chunk.index,
                 "links_to_chunks": chunk.links_to_chunks,
             }
+            if self.vault_id:
+                payload["vault_id"] = self.vault_id
             points.append(qm.PointStruct(
                 id=id_from_text(chunk.chunk_id),
                 vector=vector.astype(float).tolist(),
@@ -89,6 +93,8 @@ class VectorStore:
             "chunk_ids": note.chunk_ids,
             "links_to_notes": note.links_to_notes,
         }
+        if self.vault_id:
+            payload["vault_id"] = self.vault_id
 
         point = qm.PointStruct(
             id=id_from_text(note.note_id),
@@ -111,6 +117,12 @@ class VectorStore:
         query_vec = self.embedder.encode_one(query).flatten()
 
         must = []
+
+        if self.vault_id:
+            must.append(qm.FieldCondition(
+                key="vault_id",
+                match=qm.MatchValue(value=self.vault_id)
+            ))
 
         if note_ids is not None:
             must.append(qm.FieldCondition(
@@ -141,10 +153,20 @@ class VectorStore:
     ) -> List[qm.ScoredPoint]:
         query_vec = self.embedder.encode_one(query).flatten()
 
+        must = []
+        if self.vault_id:
+            must.append(qm.FieldCondition(
+                key="vault_id",
+                match=qm.MatchValue(value=self.vault_id)
+            ))
+
+        query_filter = qm.Filter(must=must) if must else None
+
         result = self.client.query_points(
             collection_name=NOTE_COLLECTION,
             query=query_vec.astype(float).tolist(),
-            limit=top_k
+            limit=top_k,
+            query_filter=query_filter
         ).points
         return result
 
