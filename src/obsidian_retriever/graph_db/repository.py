@@ -25,6 +25,9 @@ class NoteRepository:
             return None
         return note_node_to_record(node)
 
+    def list_all(self) -> List[NoteRecord]:
+        return [note_node_to_record(node) for node in NoteNode.nodes.all()]
+
     def upsert(self, note : NoteRecord, content_hash : str) -> NoteRecord:
         node = NoteNode.nodes.get_or_none(note_id=note.note_id)
         if node is None:

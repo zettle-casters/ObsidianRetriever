@@ -173,13 +173,17 @@ class VectorStore:
         return result
 
     def delete_chunks(self, chunk_ids : List[str]) -> None:
+        if not chunk_ids:
+            return
         self.client.delete(
             collection_name=CHUNK_COLLECTION,
-            points_selector=qm.PointIdsList(points=chunk_ids)
+            points_selector=qm.PointIdsList(points=[id_from_text(cid) for cid in chunk_ids])
         )
 
     def delete_notes(self, note_ids : List[str]) -> None:
+        if not note_ids:
+            return
         self.client.delete(
             collection_name=NOTE_COLLECTION,
-            points_selector=qm.PointIdsList(points=note_ids)
+            points_selector=qm.PointIdsList(points=[id_from_text(nid) for nid in note_ids])
         )

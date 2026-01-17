@@ -48,6 +48,95 @@ class KnowledgeBaseManager:
             return path
         return f"{self.vault_id}:{path}"
 
+    def _build_note_dict(self, path: str, content: str, max_chunk_size: int) -> Dict:
+        from obsidian_parser.parse import build_hierarchical_chunks
+
+        name = os.path.basename(path)
+        hierarchical_structure = build_hierarchical_chunks(content, max_chunk_size)
+        return {
+            "name": name,
+            "path": path,
+            "children": hierarchical_structure["children"],
+            "chunks": hierarchical_structure["chunks"],
+        }
+
+    def upsert_note_from_content(self, path: str, content: str, max_chunk_size: int = 500) -> str:
+        note_dict = self._build_note_dict(path, content, max_chunk_size)
+        note_id = self._qualify_note_id(path)
+
+        chunks_for_note, links_for_note, anchors_for_note = self._flatten_note_chunks(note_id, note_dict)
+
+        existing_note = self.note_repository.get_by_id(note_id)
+        if existing_note and existing_note.chunk_ids:
+            self.vector_store.delete_chunks(existing_note.chunk_ids)
+
+        note_record = NoteRecord(
+            note_id=note_id,
+            path=path,
+            title=note_dict["name"],
+            block_ids=None,
+            chunk_ids=[c.chunk_id for c in chunks_for_note],
+            links_to_notes=None,
+        )
+        self.add_note(note_record, chunks_for_note)
+
+        all_notes = self.note_repository.list_all()
+        path_to_note_id = {note.path: note.note_id for note in all_notes}
+        path_to_note_id[path] = note_id
+
+        anchor_to_chunk = {(note_id, title): chunk_id for title, chunk_id in anchors_for_note.items()}
+
+        to_note_ids = set()
+        chunk_links_map: Dict[str, List[str]] = {}
+
+        for from_chunk_id, links in links_for_note.items():
+            for link in links:
+                if link.get("type") != "note":
+                    continue
+                target_name = link.get("link")
+                if not target_name:
+                    continue
+
+                resolved_targets = []
+                if target_name in path_to_note_id:
+                    resolved_targets.append(path_to_note_id[target_name])
+
+                if "." not in target_name:
+                    alt = f"{target_name}.md"
+                    if alt in path_to_note_id:
+                        resolved_targets.append(path_to_note_id[alt])
+
+                basename = os.path.basename(target_name)
+                for path_key, nid in path_to_note_id.items():
+                    if os.path.basename(path_key) == basename and nid not in resolved_targets:
+                        resolved_targets.append(nid)
+
+                for to_note_id in resolved_targets:
+                    to_note_ids.add(to_note_id)
+                    anchor = link.get("anchor")
+                    if anchor:
+                        target_chunk_id = anchor_to_chunk.get((to_note_id, anchor))
+                        if target_chunk_id:
+                            chunk_links_map.setdefault(from_chunk_id, []).append(target_chunk_id)
+
+        if to_note_ids:
+            self.note_repository.set_links(note_id, list(to_note_ids), link_type="wiki")
+        else:
+            self.note_repository.set_links(note_id, [], link_type="wiki")
+
+        for from_chunk_id, to_chunk_ids in chunk_links_map.items():
+            self.chunk_repository.set_links(from_chunk_id, to_chunk_ids, link_type="reference")
+
+        return note_id
+
+    def delete_note_by_path(self, path: str) -> None:
+        note_id = self._qualify_note_id(path)
+        note = self.note_repository.get_by_id(note_id)
+        if note and note.chunk_ids:
+            self.vector_store.delete_chunks(note.chunk_ids)
+        self.vector_store.delete_notes([note_id])
+        self.note_repository.delete(note_id)
+
     def search_chunks(
         self,
         query : str,
