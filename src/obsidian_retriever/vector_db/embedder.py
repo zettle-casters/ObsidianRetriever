@@ -17,10 +17,18 @@ class EmbeddingModel:
 
         self.dim = len(self.model.embed_query("test"))
 
+    def _sanitize(self, embeddings: np.ndarray) -> np.ndarray:
+        if not np.isfinite(embeddings).all():
+            # Replace non-finite values to avoid Qdrant validation errors.
+            embeddings = np.nan_to_num(embeddings, nan=0.0, posinf=0.0, neginf=0.0)
+        return embeddings
+
     def encode(self, texts: List[str]) -> np.ndarray:
+        if not texts:
+            return np.empty((0, self.dim), dtype=float)
         embeddings = self.model.embed_documents(texts)
-        return np.array(embeddings)
+        return self._sanitize(np.array(embeddings, dtype=float))
 
     def encode_one(self, text: str) -> np.ndarray:
         embedding = self.model.embed_query(text)
-        return np.array([embedding])
+        return self._sanitize(np.array([embedding], dtype=float))

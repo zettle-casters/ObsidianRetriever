@@ -81,6 +81,8 @@ class VectorStore:
 
     def aggregate_note_embedding(self, chunks : List[ChunkRecord]) -> np.ndarray:
         texts = [chunk.text for chunk in chunks]
+        if not texts:
+            return np.zeros(self.embedder.dim, dtype=float)
         chunk_vectors = self.embedder.encode(texts)
         return chunk_vectors.mean(axis=0)
 
